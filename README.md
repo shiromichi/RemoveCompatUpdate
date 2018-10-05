@@ -1,1 +1,2 @@
 # RemoveCompatUpdate
+KB2976978を無理やり削除するアプリです。
