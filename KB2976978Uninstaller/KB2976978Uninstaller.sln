@@ -5,8 +5,6 @@ VisualStudioVersion = 15.0.28010.2016
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KB2976978Uninstaller", "KB2976978Uninstaller\KB2976978Uninstaller.csproj", "{79819C24-537A-4539-8D8B-3F5D3B8839E5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Win32Security", "KB2976978Uninstaller\Win32Security\Source\Win32Security.csproj", "{79981FF2-BB63-47C8-937C-88792A800E2F}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,10 +15,6 @@ Global
 		{79819C24-537A-4539-8D8B-3F5D3B8839E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{79819C24-537A-4539-8D8B-3F5D3B8839E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{79819C24-537A-4539-8D8B-3F5D3B8839E5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{79981FF2-BB63-47C8-937C-88792A800E2F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{79981FF2-BB63-47C8-937C-88792A800E2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{79981FF2-BB63-47C8-937C-88792A800E2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{79981FF2-BB63-47C8-937C-88792A800E2F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
