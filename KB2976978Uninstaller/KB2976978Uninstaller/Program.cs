@@ -127,7 +127,7 @@ namespace KB2976978Uninstaller
                 {
                     if (subkeyname.StartsWith("Package_for_KB2976978~"))
                     {
-                        Console.WriteLine("subkeyname");
+                        Console.WriteLine(subkeyname);
                         KB2976978List.Add(subkeyname);
                         using (RegistryKey registryKey2 = registryKey.OpenSubKey(subkeyname + "\\Owners"))
                         {
