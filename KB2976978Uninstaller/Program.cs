@@ -132,7 +132,7 @@ namespace KB2976978Uninstaller
                 {
                     if (packageName.StartsWith("Package_for_KB2976978~"))
                     {
-                        Console.WriteLine("subkeyname");
+                        Console.WriteLine(subkeyname);
                         uninstallPackages.Add(packageName);
 
                         // 目的のパッケージ名と一致するパッケージのOwnersキーを開く
