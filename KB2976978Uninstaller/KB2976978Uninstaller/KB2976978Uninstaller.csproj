@@ -54,13 +54,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="app.manifest" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="Win32Security\Source\Win32Security.csproj">
-      <Project>{79981ff2-bb63-47c8-937c-88792a800e2f}</Project>
-      <Name>Win32Security</Name>
-    </ProjectReference>
+    <None Include="app.manifest">
+      <SubType>Designer</SubType>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
