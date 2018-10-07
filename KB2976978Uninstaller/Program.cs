@@ -11,6 +11,7 @@ namespace KB2976978Uninstaller
 {
     class Program
     {
+        #region DOBON!'s code
         // コード参考元: https://dobon.net/vb/dotnet/system/shutdown.html
         // The MIT License (MIT)
         // 
@@ -22,6 +23,7 @@ namespace KB2976978Uninstaller
         //[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
         //private static extern IntPtr GetCurrentProcess();
 
+        #region Windows API
         [System.Runtime.InteropServices.DllImport("advapi32.dll", SetLastError = true)]
         private static extern bool OpenProcessToken(IntPtr ProcessHandle,
             uint DesiredAccess,
@@ -52,7 +54,9 @@ namespace KB2976978Uninstaller
             int BufferLength,
             IntPtr PreviousState,
             IntPtr ReturnLength);
+        #endregion // Windows API
 
+        #region method
         //所有者変更のためのセキュリティ特権を有効にする
         public static bool AdjustToken()
         {
@@ -61,10 +65,6 @@ namespace KB2976978Uninstaller
             const int SE_PRIVILEGE_ENABLED = 0x2;
             const string SE_TAKE_OWNERSHIP_NAME = "SeTakeOwnershipPrivilege";
 
-            //if (Environment.OSVersion.Platform != PlatformID.Win32NT)
-            //    return true;
-
-            //IntPtr procHandle = GetCurrentProcess();
             IntPtr procHandle = Process.GetCurrentProcess().Handle;
 
             //トークンを取得する
@@ -114,50 +114,58 @@ namespace KB2976978Uninstaller
             }
             return true;
         }
+        #endregion // method
+        #endregion // DOBON!'s code
 
         static void Main(string[] args)
         {
+            // 所有者変更の特権を有効にする
             if (!AdjustToken())
                 System.Environment.Exit(1);
 
-            List<String> KB2976978List = new List<string>();
-            using (RegistryKey registryKey = Registry.LocalMachine.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\Packages"))
+            List<String> uninstallPackages = new List<string>();
+
+            // パッケージの一覧があるレジストリキーを開く
+            using (RegistryKey baseRegKey = Registry.LocalMachine.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\Packages"))
             {
-                foreach (string subkeyname in registryKey.GetSubKeyNames())
+                foreach (string packageName in baseRegKey.GetSubKeyNames())
                 {
-                    if (subkeyname.StartsWith("Package_for_KB2976978~"))
+                    if (packageName.StartsWith("Package_for_KB2976978~"))
                     {
                         Console.WriteLine("subkeyname");
-                        KB2976978List.Add(subkeyname);
-                        using (RegistryKey registryKey2 = registryKey.OpenSubKey(subkeyname + "\\Owners"))
+                        uninstallPackages.Add(packageName);
+
+                        // 目的のパッケージ名と一致するパッケージのOwnersキーを開く
+                        using (RegistryKey ownersSubRegKey = baseRegKey.OpenSubKey(packageName + "\\Owners"))
                         {
-                            if ((int)registryKey2.GetValue(subkeyname) == 0x20080)
+                            // 目的のパッケージがアンインストール不可能になっているか
+                            if ((int)ownersSubRegKey.GetValue(packageName) == 0x20080)
                             {
                                 IdentityReference CurUser = WindowsIdentity.GetCurrent().User;
 
                                 // 所有者の変更
-                                using (RegistryKey registryKey3 = registryKey.OpenSubKey(subkeyname + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.TakeOwnership | RegistryRights.ReadKey | RegistryRights.ReadPermissions))
+                                using (RegistryKey rk = baseRegKey.OpenSubKey(packageName + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.TakeOwnership | RegistryRights.ReadKey | RegistryRights.ReadPermissions))
                                 {
-                                    RegistrySecurity nSubKeySec = registryKey3.GetAccessControl(AccessControlSections.Owner);
+                                    RegistrySecurity nSubKeySec = rk.GetAccessControl(AccessControlSections.Owner);
                                     nSubKeySec.SetOwner(CurUser);
-                                    registryKey3.SetAccessControl(nSubKeySec);
+                                    rk.SetAccessControl(nSubKeySec);
                                 }
 
                                 // アクセス許可の変更
-                                using (RegistryKey registryKey3 = registryKey.OpenSubKey(subkeyname + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.ChangePermissions | RegistryRights.ReadPermissions))
+                                using (RegistryKey rk = baseRegKey.OpenSubKey(packageName + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.ChangePermissions | RegistryRights.ReadPermissions))
                                 {
-                                    RegistrySecurity nSubKeySec = registryKey3.GetAccessControl(AccessControlSections.Access);
+                                    RegistrySecurity nSubKeySec = rk.GetAccessControl(AccessControlSections.Access);
                                     RegistryAccessRule nAccRule = new RegistryAccessRule(CurUser, RegistryRights.FullControl, AccessControlType.Allow);
                                     nSubKeySec.AddAccessRule(nAccRule);
-                                    registryKey3.SetAccessControl(nSubKeySec);
+                                    rk.SetAccessControl(nSubKeySec);
                                     nSubKeySec.SetOwner(CurUser);
-                                    registryKey3.SetAccessControl(nSubKeySec);
+                                    rk.SetAccessControl(nSubKeySec);
                                 }
 
-                                // 値の変更
-                                using (RegistryKey registryKey3 = registryKey.OpenSubKey(subkeyname + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.SetValue))
+                                // アンインストール可能な値に変更
+                                using (RegistryKey rk = baseRegKey.OpenSubKey(packageName + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.SetValue))
                                 {
-                                    registryKey3.SetValue(subkeyname, 0x20070);
+                                    rk.SetValue(packageName, 0x20070);
                                 }
                             }
                         }
@@ -165,23 +173,23 @@ namespace KB2976978Uninstaller
                 }
             }
 
-            StringBuilder sb = new StringBuilder();
-            if (KB2976978List.Count > 0)
+            StringBuilder dismPackageNames = new StringBuilder();
+            if (uninstallPackages.Count > 0)
             {
-                foreach (string pn in KB2976978List)
+                foreach (string pn in uninstallPackages)
                 {
-                    sb.Append(" /PackageName:");
-                    sb.Append(pn);
+                    dismPackageNames.Append(" /PackageName:");
+                    dismPackageNames.Append(pn);
                 }
             }
 
-            if (sb.Length > 0)
+            if (dismPackageNames.Length > 0)
             {
                 Console.WriteLine();
                 using (Process p = new Process())
                 {
                     p.StartInfo.FileName = "DISM";
-                    p.StartInfo.Arguments = "/Online /NoRestart /Remove-Package" + sb.ToString();
+                    p.StartInfo.Arguments = "/Online /NoRestart /Remove-Package" + dismPackageNames.ToString();
                     p.StartInfo.CreateNoWindow = true;
                     p.StartInfo.UseShellExecute = false;
                     p.StartInfo.RedirectStandardOutput = true;
@@ -208,8 +216,8 @@ namespace KB2976978Uninstaller
                     p.CancelErrorRead();
                 }
             }
-            KB2976978List.Clear();
-            sb.Clear();
+            uninstallPackages.Clear();
+            dismPackageNames.Clear();
 
             System.Environment.Exit(0);
         }
