@@ -11,6 +11,7 @@ namespace KB2976978Uninstaller
 {
     class Program
     {
+        #region DOBON!'s code
         // コード参考元: https://dobon.net/vb/dotnet/system/shutdown.html
         // The MIT License (MIT)
         // 
@@ -22,6 +23,7 @@ namespace KB2976978Uninstaller
         //[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
         //private static extern IntPtr GetCurrentProcess();
 
+        #region Windows API
         [System.Runtime.InteropServices.DllImport("advapi32.dll", SetLastError = true)]
         private static extern bool OpenProcessToken(IntPtr ProcessHandle,
             uint DesiredAccess,
@@ -52,7 +54,9 @@ namespace KB2976978Uninstaller
             int BufferLength,
             IntPtr PreviousState,
             IntPtr ReturnLength);
+        #endregion // Windows API
 
+        #region method
         //所有者変更のためのセキュリティ特権を有効にする
         public static bool AdjustToken()
         {
@@ -61,10 +65,6 @@ namespace KB2976978Uninstaller
             const int SE_PRIVILEGE_ENABLED = 0x2;
             const string SE_TAKE_OWNERSHIP_NAME = "SeTakeOwnershipPrivilege";
 
-            //if (Environment.OSVersion.Platform != PlatformID.Win32NT)
-            //    return true;
-
-            //IntPtr procHandle = GetCurrentProcess();
             IntPtr procHandle = Process.GetCurrentProcess().Handle;
 
             //トークンを取得する
@@ -114,102 +114,123 @@ namespace KB2976978Uninstaller
             }
             return true;
         }
+        #endregion // method
+        #endregion // DOBON!'s code
+
+        #region method
+        private static void ChangeRegKeyOwner(RegistryKey registryKey, IdentityReference identity)
+        {
+            RegistrySecurity nSubKeySec = registryKey.GetAccessControl(AccessControlSections.Owner);
+            nSubKeySec.SetOwner(identity);
+            registryKey.SetAccessControl(nSubKeySec);
+        }
+
+        private static void ChangeRegKeyFullControl(RegistryKey registryKey, IdentityReference identity)
+        {
+            RegistrySecurity nSubKeySec = registryKey.GetAccessControl(AccessControlSections.Access);
+            RegistryAccessRule nAccRule = new RegistryAccessRule(identity, RegistryRights.FullControl, AccessControlType.Allow);
+            nSubKeySec.AddAccessRule(nAccRule);
+            registryKey.SetAccessControl(nSubKeySec);
+            nSubKeySec.SetOwner(identity);
+            registryKey.SetAccessControl(nSubKeySec);
+        }
+
+        private static string DismPackageNames(List<string> uninstallPackages)
+        {
+            StringBuilder dismPackageNames = new StringBuilder();
+            foreach (string pn in uninstallPackages)
+            {
+                dismPackageNames.Append(" /PackageName:");
+                dismPackageNames.Append(pn);
+            }
+            return dismPackageNames.ToString();
+        }
+
+        private static void UninstallPackages(List<string> uninstallPackages)
+        {
+            string dismPackageNames = DismPackageNames(uninstallPackages);
+
+            Console.WriteLine();
+            using (Process p = new Process())
+            {
+                p.StartInfo.FileName = "DISM";
+                p.StartInfo.Arguments = "/Online /NoRestart /Remove-Package" + dismPackageNames;
+                p.StartInfo.CreateNoWindow = true;
+                p.StartInfo.UseShellExecute = false;
+                p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.RedirectStandardError = true;
+
+                //Console.WriteLine("DISM command: " + p.StartInfo.FileName + " " + p.StartInfo.Arguments);
+
+                p.OutputDataReceived += new DataReceivedEventHandler(delegate (object sender, DataReceivedEventArgs e)
+                {
+                    Console.WriteLine(e.Data);
+                });
+                p.ErrorDataReceived += new DataReceivedEventHandler(delegate (object sender, DataReceivedEventArgs e)
+                {
+                    Console.WriteLine(e.Data);
+                });
+
+                p.Start();
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+
+                p.WaitForExit();
+
+                p.CancelOutputRead();
+                p.CancelErrorRead();
+            }
+        }
+        #endregion
 
         static void Main(string[] args)
         {
+            // 所有者変更の特権を有効にする
             if (!AdjustToken())
                 System.Environment.Exit(1);
 
-            List<String> KB2976978List = new List<string>();
-            using (RegistryKey registryKey = Registry.LocalMachine.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\Packages"))
+            List<String> uninstallPackages = new List<string>();
+
+            // パッケージの一覧があるレジストリキーを開く
+            using (RegistryKey baseRegKey = Registry.LocalMachine.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\Packages"))
             {
-                foreach (string subkeyname in registryKey.GetSubKeyNames())
+                foreach (string packageName in baseRegKey.GetSubKeyNames())
                 {
-                    if (subkeyname.StartsWith("Package_for_KB2976978~"))
+                    if (packageName.StartsWith("Package_for_KB2976978~"))
                     {
-                        Console.WriteLine(subkeyname);
-                        KB2976978List.Add(subkeyname);
-                        using (RegistryKey registryKey2 = registryKey.OpenSubKey(subkeyname + "\\Owners"))
+                        Console.WriteLine(packageName);
+                        uninstallPackages.Add(packageName);
+
+                        // 目的のパッケージ名と一致するパッケージのOwnersキーを開く
+                        const string ownersSubKey = "\\Owners";
+                        using (RegistryKey ownersSubRegKey = baseRegKey.OpenSubKey(packageName + ownersSubKey))
                         {
-                            if ((int)registryKey2.GetValue(subkeyname) == 0x20080)
+                            // 目的のパッケージがアンインストール不可能になっているか
+                            if ((int)ownersSubRegKey.GetValue(packageName) == 0x20080)
                             {
                                 IdentityReference CurUser = WindowsIdentity.GetCurrent().User;
 
                                 // 所有者の変更
-                                using (RegistryKey registryKey3 = registryKey.OpenSubKey(subkeyname + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.TakeOwnership | RegistryRights.ReadKey | RegistryRights.ReadPermissions))
-                                {
-                                    RegistrySecurity nSubKeySec = registryKey3.GetAccessControl(AccessControlSections.Owner);
-                                    nSubKeySec.SetOwner(CurUser);
-                                    registryKey3.SetAccessControl(nSubKeySec);
-                                }
+                                using (RegistryKey rk = baseRegKey.OpenSubKey(packageName + ownersSubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.TakeOwnership | RegistryRights.ReadKey | RegistryRights.ReadPermissions))
+                                    ChangeRegKeyOwner(rk, CurUser);
 
                                 // アクセス許可の変更
-                                using (RegistryKey registryKey3 = registryKey.OpenSubKey(subkeyname + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.ChangePermissions | RegistryRights.ReadPermissions))
-                                {
-                                    RegistrySecurity nSubKeySec = registryKey3.GetAccessControl(AccessControlSections.Access);
-                                    RegistryAccessRule nAccRule = new RegistryAccessRule(CurUser, RegistryRights.FullControl, AccessControlType.Allow);
-                                    nSubKeySec.AddAccessRule(nAccRule);
-                                    registryKey3.SetAccessControl(nSubKeySec);
-                                    nSubKeySec.SetOwner(CurUser);
-                                    registryKey3.SetAccessControl(nSubKeySec);
-                                }
+                                using (RegistryKey rk = baseRegKey.OpenSubKey(packageName + ownersSubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.ChangePermissions | RegistryRights.ReadPermissions))
+                                    ChangeRegKeyFullControl(rk, CurUser);
 
-                                // 値の変更
-                                using (RegistryKey registryKey3 = registryKey.OpenSubKey(subkeyname + "\\Owners", RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.SetValue))
-                                {
-                                    registryKey3.SetValue(subkeyname, 0x20070);
-                                }
+                                // アンインストール可能な値に変更
+                                using (RegistryKey rk = baseRegKey.OpenSubKey(packageName + ownersSubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.SetValue))
+                                    rk.SetValue(packageName, 0x20070);
                             }
                         }
                     }
                 }
             }
 
-            StringBuilder sb = new StringBuilder();
-            if (KB2976978List.Count > 0)
-            {
-                foreach (string pn in KB2976978List)
-                {
-                    sb.Append(" /PackageName:");
-                    sb.Append(pn);
-                }
-            }
+            if (uninstallPackages.Count > 0)
+                UninstallPackages(uninstallPackages);
 
-            if (sb.Length > 0)
-            {
-                Console.WriteLine();
-                using (Process p = new Process())
-                {
-                    p.StartInfo.FileName = "DISM";
-                    p.StartInfo.Arguments = "/Online /NoRestart /Remove-Package" + sb.ToString();
-                    p.StartInfo.CreateNoWindow = true;
-                    p.StartInfo.UseShellExecute = false;
-                    p.StartInfo.RedirectStandardOutput = true;
-                    p.StartInfo.RedirectStandardError = true;
-
-                    //Console.WriteLine("DISM command: " + p.StartInfo.FileName + " " + p.StartInfo.Arguments);
-
-                    p.OutputDataReceived += new DataReceivedEventHandler(delegate (object sender, DataReceivedEventArgs e)
-                    {
-                        Console.WriteLine(e.Data);
-                    });
-                    p.ErrorDataReceived += new DataReceivedEventHandler(delegate (object sender, DataReceivedEventArgs e)
-                    {
-                        Console.WriteLine(e.Data);
-                    });
-
-                    p.Start();
-                    p.BeginOutputReadLine();
-                    p.BeginErrorReadLine();
-
-                    p.WaitForExit();
-
-                    p.CancelOutputRead();
-                    p.CancelErrorRead();
-                }
-            }
-            KB2976978List.Clear();
-            sb.Clear();
+            uninstallPackages.Clear();
 
             System.Environment.Exit(0);
         }

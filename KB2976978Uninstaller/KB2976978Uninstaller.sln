@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2016
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KB2976978Uninstaller", "KB2976978Uninstaller\KB2976978Uninstaller.csproj", "{79819C24-537A-4539-8D8B-3F5D3B8839E5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KB2976978Uninstaller", "KB2976978Uninstaller.csproj", "{79819C24-537A-4539-8D8B-3F5D3B8839E5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
